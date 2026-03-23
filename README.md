@@ -7,4 +7,4 @@ For Mobile Users I Think Its Pretty Stable And Same Rules As The PC Version
 # Devopers
 Devolopers(1):
 Realtotim
-YT : (Youtube Channel Link Click Here)(https://www.youtube.com/@RealtotimOffical]
+YT : (Youtube Channel Link Click Here)[https://www.youtube.com/@RealtotimOffical]
