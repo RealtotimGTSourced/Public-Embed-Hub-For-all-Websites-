@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi Embed Viewer v7 (Popup Cookie)</title>
+<style>
+body{margin:0;font-family:Arial;background:var(--bg,linear-gradient(135deg,#141e30,#243b55));color:white;overflow-y:scroll;transition:0.3s;}
+header{padding:15px;text-align:center;font-size:24px;font-weight:bold;background:rgba(0,0,0,0.4);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100;}
+.controls{display:flex;justify-content:center;gap:10px;padding:10px;flex-wrap:wrap;}
+input{width:40%;padding:10px;border-radius:10px;border:none;}
+button{padding:10px 15px;border:none;border-radius:10px;cursor:pointer;background:#00c6ff;color:black;font-weight:bold;}
+button:hover{transform:scale(1.05);} 
+.danger{background:#ff4d4d;color:white;}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:15px;padding:20px;padding-bottom:60px;}
+.embed-card{position:relative;}
+iframe{width:100%;height:320px;border:none;border-radius:14px;box-shadow:0 0 20px rgba(0,0,0,0.6);}
+
+.top-buttons{position:absolute;top:8px;right:8px;display:flex;gap:5px;z-index:10;}
+.small-btn{background:rgba(0,0,0,0.7);border:none;color:white;border-radius:6px;cursor:pointer;padding:4px 6px;font-size:12px;}
+
+.panel{display:flex;gap:10px;padding:10px;overflow-x:auto;}
+.card{background:rgba(255,255,255,0.1);padding:10px;border-radius:10px;cursor:pointer;display:flex;gap:8px;align-items:center;}
+.delete-btn{background:#ff4d4d;border:none;border-radius:6px;color:white;cursor:pointer;padding:2px 6px;}
+.section-title{padding-left:10px;font-weight:bold;opacity:0.8;}
+
+.hidden-text{filter:blur(8px);} 
+
+/* POPUP */
+#popupOverlay{
+ position:fixed;
+ top:0;left:0;
+ width:100%;height:100%;
+ background:rgba(0,0,0,0.85);
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ z-index:999999;
+ backdrop-filter:blur(8px);
+}
+
+#popupBox{
+ background:rgba(0,0,0,0.9);
+ padding:30px;
+ border-radius:18px;
+ text-align:center;
+ width:320px;
+ box-shadow:0 0 30px rgba(0,0,0,0.9);
+ animation:popIn 0.3s ease;
+}
+
+#popupBtn{
+ padding:10px 20px;
+ border:none;
+ border-radius:10px;
+ background:#00c6ff;
+ color:black;
+ font-weight:bold;
+ cursor:pointer;
+}
+
+@keyframes popIn{
+ from{transform:scale(0.6);opacity:0;}
+ to{transform:scale(1);opacity:1;}
+}
+</style>
+</head>
+<body>
+
+<header>🚀 Multi Embed Viewer v9</header>
+
+<div class="controls">
+<input type="text" id="urlInput" placeholder="Enter URL...">
+<button onclick="addEmbed()">Embed</button>
+<button onclick="saveBookmark()">⭐ Bookmark</button>
+<button onclick="toggleStreamerMode()">🎥 Stream Mode</button>
+<button onclick="toggleBookmarks()">📌 Toggle Bookmarks</button>
+<button onclick="toggleHistory()">🕘 Toggle History</button>
+<button onclick="setCustomBackground()">🎨 Background</button>
+<button class="danger" onclick="clearEmbeds()">🧹 Clear</button>
+</div>
+
+<div id="bookmarksSection">
+<div class="section-title">📌 Bookmarks</div>
+<div class="panel" id="bookmarks"></div>
+</div>
+
+<div id="historySection">
+<div class="section-title">🕘 History</div>
+<div class="panel" id="history"></div>
+</div>
+
+<div class="grid" id="embedContainer"></div>
+
+<!-- POPUP -->
+<div id="popupOverlay" style="display:none;">
+  <div id="popupBox">
+    <h2>⚠ Important Notice</h2>
+    <p>This Is V9 Of This Embed Hub And Was Made By 🔗<a href="https://github.com/RealtotimGTSourced" target="_blank" class="link-btn" style="color:#00c6ff;text-decoratuon:none;font=weight:bold">RealtotimGTSourced On Github</a> And just for Youtube links use the share on youtu.be or youtube.com on google or start the app on phone search a video up then clck it then share then copy link and copy that here and this will display it As an Embed Did You Read It?Do You Understand</p>
+    <button id="popupBtn">I Understand!</button>
+  </div>
+</div>
+
+<script>
+const bookmarksKey="myBookmarks";
+const historyKey="myHistory";
+const bgKey="customBG";
+const settingsKey="viewerSettings";
+
+let streamerMode = false;
+
+let settings = JSON.parse(localStorage.getItem(settingsKey)) || {
+  showBookmarks: true,
+  showHistory: true
+};
+
+function saveSettings(){
+  localStorage.setItem(settingsKey, JSON.stringify(settings));
+}
+
+function applyVisibility(){
+  document.getElementById('bookmarksSection').style.display = settings.showBookmarks ? 'block' : 'none';
+  document.getElementById('historySection').style.display = settings.showHistory ? 'block' : 'none';
+}
+
+function toggleBookmarks(){
+  settings.showBookmarks = !settings.showBookmarks;
+  saveSettings();
+  applyVisibility();
+}
+
+function toggleHistory(){
+  settings.showHistory = !settings.showHistory;
+  saveSettings();
+  applyVisibility();
+}
+
+function toggleStreamerMode(){
+  streamerMode = !streamerMode;
+  renderHistory();
+}
+
+function formatURL(url){return url.startsWith('http')?url:'https://'+url;}
+
+function processURL(url){
+ if(url.includes("youtube.com/watch")){
+  const id=url.split("v=")[1]?.split("&")[0];
+  return `https://www.youtube.com/embed/${id}`;
+ }
+ return url;
+}
+
+function addEmbed(urlInputVal=null){
+ const input=document.getElementById('urlInput');
+ let url=urlInputVal||input.value.trim();
+ if(!url) return;
+
+ url=formatURL(url);
+ const embedURL=processURL(url);
+
+ const wrapper=document.createElement('div'); wrapper.className='embed-card';
+ const iframe=document.createElement('iframe'); iframe.src=embedURL; iframe.allowFullscreen=true;
+
+ const topBtns=document.createElement('div'); topBtns.className='top-buttons';
+
+ const removeBtn=document.createElement('button'); removeBtn.innerText='X'; removeBtn.className='small-btn'; removeBtn.onclick=()=>wrapper.remove();
+ const fullBtn=document.createElement('button'); fullBtn.innerText='⛶'; fullBtn.className='small-btn'; fullBtn.onclick=()=>iframe.requestFullscreen();
+ const openBtn=document.createElement('button'); openBtn.innerText='↗'; openBtn.className='small-btn'; openBtn.onclick=()=>window.open(url,'_blank');
+ const copyBtn=document.createElement('button'); copyBtn.innerText='📋'; copyBtn.className='small-btn'; copyBtn.onclick=()=>navigator.clipboard.writeText(url);
+
+ topBtns.append(fullBtn,openBtn,copyBtn,removeBtn);
+ wrapper.append(topBtns,iframe);
+ document.getElementById('embedContainer').appendChild(wrapper);
+
+ saveHistory(url);
+ input.value='';
+}
+
+function clearEmbeds(){document.getElementById('embedContainer').innerHTML='';}
+
+function saveBookmark(){
+ const input=document.getElementById('urlInput');
+ let url=input.value.trim();
+ if(!url) return;
+ url=formatURL(url);
+
+ let name=prompt("Name this bookmark:", url);
+ if(!name) name=url;
+
+ let b=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+ b.push({name,url});
+ localStorage.setItem(bookmarksKey,JSON.stringify(b));
+ renderBookmarks();
+}
+
+function deleteBookmark(i){let b=JSON.parse(localStorage.getItem(bookmarksKey))||[];b.splice(i,1);localStorage.setItem(bookmarksKey,JSON.stringify(b));renderBookmarks();}
+
+function renderBookmarks(){
+ const c=document.getElementById('bookmarks'); c.innerHTML='';
+ let b=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+
+ b.forEach((item,i)=>{
+  const d=document.createElement('div'); d.className='card';
+
+  const t=document.createElement('span'); t.innerText=item.name;
+  t.onclick=()=>addEmbed(item.url);
+
+  const del=document.createElement('button'); del.innerText='x'; del.className='delete-btn'; del.onclick=(e)=>{e.stopPropagation();deleteBookmark(i);};
+
+  d.append(t,del);
+  c.appendChild(d);
+ });
+}
+
+function saveHistory(url){
+ let h=JSON.parse(localStorage.getItem(historyKey))||[];
+ h.unshift(url);
+ h=h.slice(0,10);
+ localStorage.setItem(historyKey,JSON.stringify(h));
+ renderHistory();
+}
+
+function deleteHistory(i){let h=JSON.parse(localStorage.getItem(historyKey))||[];h.splice(i,1);localStorage.setItem(historyKey,JSON.stringify(h));renderHistory();}
+
+function renderHistory(){
+ const c=document.getElementById('history'); c.innerHTML='';
+ let h=JSON.parse(localStorage.getItem(historyKey))||[];
+
+ h.forEach((url,i)=>{
+  const d=document.createElement('div'); d.className='card';
+
+  const t=document.createElement('span'); t.innerText=url;
+  if(streamerMode) t.classList.add('hidden-text');
+  t.onclick=()=>addEmbed(url);
+
+  const del=document.createElement('button'); del.innerText='x'; del.className='delete-btn'; del.onclick=(e)=>{e.stopPropagation();deleteHistory(i);};
+
+  d.append(t,del);
+  c.appendChild(d);
+ });
+}
+
+function setCustomBackground(){
+ let url=prompt("Enter image URL (leave blank for default):");
+ if(!url){
+  localStorage.removeItem(bgKey);
+  document.body.style.setProperty('--bg','linear-gradient(135deg,#141e30,#243b55)');
+ } else {
+  localStorage.setItem(bgKey,url);
+  document.body.style.setProperty('--bg',`url(${url}) center/cover no-repeat`);
+ }
+}
+
+// COOKIE POPUP LOGIC
+function setCookie(name,value,days){
+ let d=new Date();
+ d.setTime(d.getTime()+(days*24*60*60*1000));
+ document.cookie=name+"="+value+";expires="+d.toUTCString()+";path=/";
+}
+
+function getCookie(name){
+ let cname=name+"=";
+ let decodedCookie=decodeURIComponent(document.cookie);
+ let ca=decodedCookie.split(';');
+ for(let i=0;i<ca.length;i++){
+  let c=ca[i].trim();
+  if(c.indexOf(cname)==0) return c.substring(cname.length,c.length);
+ }
+ return "";
+}
+
+if(!getCookie("popupSeen")){
+ document.getElementById("popupOverlay").style.display="flex";
+ document.body.style.overflow="hidden";
+}
+
+document.getElementById("popupBtn").onclick=()=>{
+ setCookie("popupSeen","yes",30);
+ document.getElementById("popupOverlay").remove();
+ document.body.style.overflow="auto";
+};
+
+(function(){
+ let bg=localStorage.getItem(bgKey);
+ if(bg){document.body.style.setProperty('--bg',`url(${bg}) center/cover no-repeat`);} 
+})();
+
+renderBookmarks();
+renderHistory();
+applyVisibility();
+</script>
+
+</body>
+</html>
