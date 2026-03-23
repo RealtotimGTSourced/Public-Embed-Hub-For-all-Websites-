@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi Embed Viewer v4</title>
+  <style>
+    body { margin:0; font-family:Arial; background:linear-gradient(135deg,#141e30,#243b55); color:white; }
+    header { padding:15px; text-align:center; font-size:24px; font-weight:bold; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px);} 
+    .controls { display:flex; justify-content:center; gap:10px; padding:10px; flex-wrap:wrap; }
+    input { width:50%; padding:10px; border-radius:10px; border:none; }
+    button { padding:10px 15px; border:none; border-radius:10px; cursor:pointer; background:#00c6ff; color:black; font-weight:bold; }
+    .danger { background:#ff4d4d; color:white; }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; padding:10px; }
+
+    .embed-card { position:relative; }
+    iframe { width:100%; height:300px; border:none; border-radius:12px; box-shadow:0 0 15px rgba(0,0,0,0.5); }
+
+    .remove-embed {
+      position:absolute;
+      top:8px;
+      right:8px;
+      background:#ff4d4d;
+      border:none;
+      border-radius:6px;
+      color:white;
+      cursor:pointer;
+      padding:4px 8px;
+      z-index:10;
+    }
+
+    .panel { display:flex; gap:10px; padding:10px; overflow-x:auto; align-items:center; }
+    .card { background:rgba(255,255,255,0.1); padding:10px; border-radius:10px; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+    .delete-btn { background:#ff4d4d; border:none; border-radius:6px; color:white; cursor:pointer; padding:2px 6px; }
+    .section-title { padding-left:10px; font-weight:bold; opacity:0.8; }
+  </style>
+</head>
+<body>
+
+<header>🚀 Multi Embed Viewer v4 (Full Control)</header>
+
+<div class="controls">
+  <input type="text" id="urlInput" placeholder="Enter URL...">
+  <button onclick="addEmbed()">Embed</button>
+  <button onclick="saveBookmark()">⭐ Bookmark</button>
+  <button class="danger" onclick="clearEmbeds()">🧹 Clear Embeds</button>
+</div>
+
+<div class="section-title">📌 Bookmarks</div>
+<div class="panel" id="bookmarks"></div>
+<div class="controls">
+  <button class="danger" onclick="clearBookmarks()">Clear Bookmarks</button>
+</div>
+
+<div class="section-title">🕘 History</div>
+<div class="panel" id="history"></div>
+<div class="controls">
+  <button class="danger" onclick="clearHistory()">Clear History</button>
+</div>
+
+<div class="grid" id="embedContainer"></div>
+
+<script>
+  const bookmarksKey="myBookmarks";
+  const historyKey="myHistory";
+
+  function formatURL(url){ if(!url.startsWith('http')) return 'https://'+url; return url; }
+
+  function processURL(url){
+    if(url.includes("youtube.com/watch")){
+      const id=url.split("v=")[1]?.split("&")[0];
+      return `https://www.youtube.com/embed/${id}`;
+    }
+    return url;
+  }
+
+  function addEmbed(urlInputVal=null){
+    const input=document.getElementById('urlInput');
+    let url=urlInputVal||input.value.trim();
+    if(!url) return;
+
+    url=processURL(formatURL(url));
+
+    const wrapper=document.createElement('div');
+    wrapper.className='embed-card';
+
+    const iframe=document.createElement('iframe');
+    iframe.src=url;
+
+    const removeBtn=document.createElement('button');
+    removeBtn.innerText='X';
+    removeBtn.className='remove-embed';
+    removeBtn.onclick=()=>wrapper.remove();
+
+    wrapper.appendChild(removeBtn);
+    wrapper.appendChild(iframe);
+
+    document.getElementById('embedContainer').appendChild(wrapper);
+
+    saveHistory(url);
+    input.value='';
+  }
+
+  function clearEmbeds(){
+    document.getElementById('embedContainer').innerHTML='';
+  }
+
+  function saveBookmark(){
+    const input=document.getElementById('urlInput');
+    let url=input.value.trim();
+    if(!url) return;
+    url=formatURL(url);
+
+    let bookmarks=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+    if(!bookmarks.includes(url)){
+      bookmarks.push(url);
+      localStorage.setItem(bookmarksKey,JSON.stringify(bookmarks));
+      renderBookmarks();
+    }
+  }
+
+  function deleteBookmark(index){
+    let bookmarks=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+    bookmarks.splice(index,1);
+    localStorage.setItem(bookmarksKey,JSON.stringify(bookmarks));
+    renderBookmarks();
+  }
+
+  function deleteHistory(index){
+    let history=JSON.parse(localStorage.getItem(historyKey))||[];
+    history.splice(index,1);
+    localStorage.setItem(historyKey,JSON.stringify(history));
+    renderHistory();
+  }
+
+  function clearBookmarks(){ localStorage.removeItem(bookmarksKey); renderBookmarks(); }
+  function clearHistory(){ localStorage.removeItem(historyKey); renderHistory(); }
+
+  function saveHistory(url){
+    let history=JSON.parse(localStorage.getItem(historyKey))||[];
+    history.unshift(url);
+    history=history.slice(0,10);
+    localStorage.setItem(historyKey,JSON.stringify(history));
+    renderHistory();
+  }
+
+  function renderBookmarks(){
+    const container=document.getElementById('bookmarks');
+    container.innerHTML='';
+    let bookmarks=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+
+    bookmarks.forEach((url,index)=>{
+      const div=document.createElement('div'); div.className='card';
+
+      const text=document.createElement('span');
+      text.innerText=url;
+      text.onclick=()=>addEmbed(url);
+
+      const del=document.createElement('button');
+      del.innerText='x'; del.className='delete-btn';
+      del.onclick=(e)=>{ e.stopPropagation(); deleteBookmark(index); };
+
+      div.appendChild(text); div.appendChild(del);
+      container.appendChild(div);
+    });
+  }
+
+  function renderHistory(){
+    const container=document.getElementById('history');
+    container.innerHTML='';
+    let history=JSON.parse(localStorage.getItem(historyKey))||[];
+
+    history.forEach((url,index)=>{
+      const div=document.createElement('div'); div.className='card';
+
+      const text=document.createElement('span');
+      text.innerText=url;
+      text.onclick=()=>addEmbed(url);
+
+      const del=document.createElement('button');
+      del.innerText='x'; del.className='delete-btn';
+      del.onclick=(e)=>{ e.stopPropagation(); deleteHistory(index); };
+
+      div.appendChild(text); div.appendChild(del);
+      container.appendChild(div);
+    });
+  }
+
+  renderBookmarks();
+  renderHistory();
+</script>
+
+</body>
+</html>
