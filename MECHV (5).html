@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi Embed Viewer v6</title>
+<style>
+body{margin:0;font-family:Arial;background:linear-gradient(135deg,#141e30,#243b55);color:white;overflow-y:scroll;}
+header{padding:15px;text-align:center;font-size:24px;font-weight:bold;background:rgba(0,0,0,0.4);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100;}
+.controls{display:flex;justify-content:center;gap:10px;padding:10px;flex-wrap:wrap;}
+input{width:50%;padding:10px;border-radius:10px;border:none;}
+button{padding:10px 15px;border:none;border-radius:10px;cursor:pointer;background:#00c6ff;color:black;font-weight:bold;}
+button:hover{transform:scale(1.05);} 
+.danger{background:#ff4d4d;color:white;}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:15px;padding:20px;padding-bottom:60px;}
+
+.embed-card{position:relative;}
+iframe{width:100%;height:320px;border:none;border-radius:14px;box-shadow:0 0 20px rgba(0,0,0,0.6);}
+
+.top-buttons{position:absolute;top:8px;right:8px;display:flex;gap:5px;z-index:10;}
+.small-btn{background:rgba(0,0,0,0.7);border:none;color:white;border-radius:6px;cursor:pointer;padding:4px 6px;font-size:12px;}
+
+.panel{display:flex;gap:10px;padding:10px;overflow-x:auto;}
+.card{background:rgba(255,255,255,0.1);padding:10px;border-radius:10px;cursor:pointer;display:flex;gap:8px;}
+.delete-btn{background:#ff4d4d;border:none;border-radius:6px;color:white;cursor:pointer;padding:2px 6px;}
+.section-title{padding-left:10px;font-weight:bold;opacity:0.8;}
+</style>
+</head>
+<body>
+
+<header>🚀 Multi Embed Viewer v6 (Fixed + Improved)</header>
+
+<div class="controls">
+<input type="text" id="urlInput" placeholder="Enter URL...">
+<button onclick="addEmbed()">Embed</button>
+<button onclick="saveBookmark()">⭐ Bookmark</button>
+<button class="danger" onclick="clearEmbeds()">🧹 Clear Embeds</button>
+</div>
+
+<div class="section-title">📌 Bookmarks</div>
+<div class="panel" id="bookmarks"></div>
+
+<div class="section-title">🕘 History</div>
+<div class="panel" id="history"></div>
+
+<div class="grid" id="embedContainer"></div>
+
+<script>
+const bookmarksKey="myBookmarks";
+const historyKey="myHistory";
+
+function formatURL(url){return url.startsWith('http')?url:'https://'+url;}
+
+function processURL(url){
+ if(url.includes("youtube.com/watch")){
+  const id=url.split("v=")[1]?.split("&")[0];
+  return `https://www.youtube.com/embed/${id}`;
+ }
+ return url;
+}
+
+function addEmbed(urlInputVal=null){
+ const input=document.getElementById('urlInput');
+ let url=urlInputVal||input.value.trim();
+ if(!url) return;
+
+ url=formatURL(url);
+ const embedURL=processURL(url);
+
+ const wrapper=document.createElement('div');
+ wrapper.className='embed-card';
+
+ const iframe=document.createElement('iframe');
+ iframe.src=embedURL;
+ iframe.allowFullscreen=true;
+
+ const topBtns=document.createElement('div');
+ topBtns.className='top-buttons';
+
+ // REMOVE
+ const removeBtn=document.createElement('button');
+ removeBtn.innerText='X';
+ removeBtn.className='small-btn';
+ removeBtn.onclick=()=>wrapper.remove();
+
+ // FULLSCREEN FIXED
+ const fullBtn=document.createElement('button');
+ fullBtn.innerText='⛶';
+ fullBtn.className='small-btn';
+ fullBtn.onclick=()=>{
+   if(iframe.requestFullscreen){ iframe.requestFullscreen(); }
+ };
+
+ // OPEN IN NEW TAB
+ const openBtn=document.createElement('button');
+ openBtn.innerText='↗';
+ openBtn.className='small-btn';
+ openBtn.onclick=()=>{
+   window.open(url,'_blank');
+ };
+
+ // COPY LINK
+ const copyBtn=document.createElement('button');
+ copyBtn.innerText='📋';
+ copyBtn.className='small-btn';
+ copyBtn.onclick=async()=>{
+   await navigator.clipboard.writeText(url);
+   copyBtn.innerText='✔';
+   setTimeout(()=>copyBtn.innerText='📋',1000);
+ };
+
+ topBtns.appendChild(fullBtn);
+ topBtns.appendChild(openBtn);
+ topBtns.appendChild(copyBtn);
+ topBtns.appendChild(removeBtn);
+
+ wrapper.appendChild(topBtns);
+ wrapper.appendChild(iframe);
+
+ document.getElementById('embedContainer').appendChild(wrapper);
+
+ saveHistory(url);
+ input.value='';
+}
+
+function clearEmbeds(){document.getElementById('embedContainer').innerHTML='';}
+
+function saveBookmark(){
+ const input=document.getElementById('urlInput');
+ let url=input.value.trim();
+ if(!url) return;
+ url=formatURL(url);
+
+ let b=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+ if(!b.includes(url)){
+  b.push(url);
+  localStorage.setItem(bookmarksKey,JSON.stringify(b));
+  renderBookmarks();
+ }
+}
+
+function saveHistory(url){
+ let h=JSON.parse(localStorage.getItem(historyKey))||[];
+ h.unshift(url);
+ h=h.slice(0,10);
+ localStorage.setItem(historyKey,JSON.stringify(h));
+ renderHistory();
+}
+
+function deleteBookmark(i){let b=JSON.parse(localStorage.getItem(bookmarksKey))||[];b.splice(i,1);localStorage.setItem(bookmarksKey,JSON.stringify(b));renderBookmarks();}
+function deleteHistory(i){let h=JSON.parse(localStorage.getItem(historyKey))||[];h.splice(i,1);localStorage.setItem(historyKey,JSON.stringify(h));renderHistory();}
+
+function renderBookmarks(){
+ const c=document.getElementById('bookmarks');c.innerHTML='';
+ let b=JSON.parse(localStorage.getItem(bookmarksKey))||[];
+ b.forEach((url,i)=>{
+  const d=document.createElement('div');d.className='card';
+  const t=document.createElement('span');t.innerText=url;t.onclick=()=>addEmbed(url);
+  const del=document.createElement('button');del.innerText='x';del.className='delete-btn';del.onclick=(e)=>{e.stopPropagation();deleteBookmark(i);};
+  d.appendChild(t);d.appendChild(del);c.appendChild(d);
+ });
+}
+
+function renderHistory(){
+ const c=document.getElementById('history');c.innerHTML='';
+ let h=JSON.parse(localStorage.getItem(historyKey))||[];
+ h.forEach((url,i)=>{
+  const d=document.createElement('div');d.className='card';
+  const t=document.createElement('span');t.innerText=url;t.onclick=()=>addEmbed(url);
+  const del=document.createElement('button');del.innerText='x';del.className='delete-btn';del.onclick=(e)=>{e.stopPropagation();deleteHistory(i);};
+  d.appendChild(t);d.appendChild(del);c.appendChild(d);
+ });
+}
+
+renderBookmarks();
+renderHistory();
+</script>
+
+</body>
+</html>
